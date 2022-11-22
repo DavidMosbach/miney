@@ -185,33 +185,39 @@ class Minetest:
                 data_buffer = b""
                 while "\n" not in data_buffer.decode():
                     data_buffer = data_buffer + self.connection.recv(4096)
-                data = json.loads(data_buffer.decode())
+                #print("json looks like:", data_buffer.decode()) ##TODO
+                json_strings = str(data_buffer.decode()).split('\n')
+                json_strings.pop()
+                #print("json looks like:", json_strings) ##TODO
+                data_list = [json.loads(s) for s in json_strings]
+                #data = json.loads(data_buffer.decode()) ##TODO
             except socket.timeout:
                 raise miney.LuaResultTimeout()
     
             # process data
-            if "result" in data:
-                if result_id:  # do we need a specific result?
-                    if data["id"] == result_id:  # we've got the result we wanted
-                        return format_result(data)
-                # We store this for later processing
-                self.result_queue[data["id"]] = data
-            elif "error" in data:
-                if data["error"] == "authentication error":
-                    if self.clientid:
-                        # maybe a server restart or timeout. We just reauthenticate.
-                        self._authenticate()
-                        raise miney.SessionReconnected()
-                    else:  # the server kicked us
-                        raise miney.AuthenticationError("Wrong playername or password")
-                else:
-                    raise miney.LuaError("Lua-Error: " + data["error"])
-            elif "event" in data:
-                self._run_callback(data)
-    
-            # if we don't got our result we have to receive again
-            if result_id:
-                self.receive(result_id)
+            for data in data_list: ##TODO
+                if "result" in data:
+                    if result_id:  # do we need a specific result?
+                        if data["id"] == result_id:  # we've got the result we wanted
+                            return format_result(data)
+                    # We store this for later processing
+                    self.result_queue[data["id"]] = data
+                elif "error" in data:
+                    if data["error"] == "authentication error":
+                        if self.clientid:
+                            # maybe a server restart or timeout. We just reauthenticate.
+                            self._authenticate()
+                            raise miney.SessionReconnected()
+                        else:  # the server kicked us
+                            raise miney.AuthenticationError("Wrong playername or password")
+                    else:
+                        raise miney.LuaError("Lua-Error: " + data["error"])
+                elif "event" in data:
+                    self._run_callback(data)
+        
+                # if we don't got our result we have to receive again
+                if result_id:
+                    self.receive(result_id)
 
         except ConnectionAbortedError:
             self._connect()
@@ -231,12 +237,13 @@ class Minetest:
         self.send({'activate_event': {'event': name}, 'id': result_id})
 
     def _run_callback(self, data: dict):
-        if data['event'] in self.callbacks:
-            # self.callbacks[data['event']](**data['event']['params'])
-            if type(data['params']) is dict:
-                self.callbacks[data['event']](**data['params'])
-            elif type(data['params']) is list:
-                self.callbacks[data['event']](*data['params'])
+        print("data looks like:", str(data), "callbacks look like:", str(self.callbacks)) ##TODO
+        # if data['event'] in self.callbacks:
+        #     # self.callbacks[data['event']](**data['event']['params'])
+        #     if type(data['params']) is dict:
+        #         self.callbacks[data['event']](**data['params'])
+        #     elif type(data['params']) is list:
+        #         self.callbacks[data['event']](*data['params'])
 
     @property
     def chat(self):
